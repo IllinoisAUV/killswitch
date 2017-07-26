@@ -2,25 +2,27 @@
 
 #include <stddef.h>
 #include "ros/ros.h"
+#include "ros/console.h"
 #include "std_msgs/Bool.h"
 
 #include "gpio.h"
 
 
-
+const bool kReverse = true;
 
 KillSwitch::KillSwitch(unsigned int pin) : pin_(pin), node_() {
   pin_.SetDirection(GPIO::IN);
-  pin_.SetActiveState(GPIO::ACTIVE_HIGH);
+  pin_.SetActiveState(GPIO::ACTIVE_LOW);
 }
 
 KillSwitch::~KillSwitch() {}
 
-void KillSwitch::publishMessage(GPIO::Edge value, ros::Publisher pub) {
+void KillSwitch::publishMessage(bool value, ros::Publisher pub) {
   // Build the message
   std_msgs::Bool msg;
-  msg.data = (value == GPIO::RISING ? true : false);
+  msg.data = value;
 
+  ROS_INFO("Kill Switch: %s", msg.data ? "pressed" : "released");
   pub.publish(msg);
 }
 
@@ -32,21 +34,19 @@ void KillSwitch::Run() {
   GPIO::LogicLevel value = pin_.GetValue();
 
   bool pressed = (value == GPIO::HIGH);
-  publishMessage(pressed ? GPIO::RISING : GPIO::FALLING, pub);
+  bool last_pressed = pressed;
+  publishMessage(pressed, pub);
 
-
-
-
+  ros::Rate rate(10);
   while(ros::ok()) {
-    if(pressed) {
-      pin_.WaitOn(GPIO::FALLING);
-      pressed = false;
-      publishMessage(GPIO::FALLING, pub);
-
-    } else {
-      pin_.WaitOn(GPIO::RISING);
-      pressed = true;
-      publishMessage(GPIO::RISING, pub);
-    }
+      rate.sleep();
+      value = pin_.GetValue();
+      pressed = (value == GPIO::HIGH);
+      if (pressed != last_pressed) {
+          // Transition
+          publishMessage(pressed, pub);
+      }
+      last_pressed = pressed;
+      ros::spinOnce();
   }
 }

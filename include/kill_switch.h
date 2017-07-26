@@ -15,7 +15,7 @@ public:
   ~KillSwitch();
   void Run();
 private:
-  void publishMessage(GPIO::Edge value, ros::Publisher pub);
+  void publishMessage(bool value, ros::Publisher pub);
   ros::NodeHandle node_;
   GPIO pin_;
 };
