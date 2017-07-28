@@ -21,7 +21,7 @@
 #define STATE_ACTIVE_HIGH "0\n"
 #define STATE_ACTIVE_LOW "1\n"
 
-GPIO::GPIO(unsigned int pin) : pin_(pin) {
+GPIO::GPIO(unsigned int pin) : pin_(pin), owner_(false) {
   openFiles();
 }
 
@@ -31,8 +31,10 @@ GPIO::~GPIO() {
 
 void GPIO::cleanup() {
   closePinFiles();
-  unexport();
-  closeExportFiles();
+  if(owner_) {
+      unexport();
+      closeExportFiles();
+  }
 }
 
 void GPIO::closePinFiles() {
@@ -56,33 +58,43 @@ void GPIO::closeExportFiles() {
 
 void GPIO::openFiles() {
   char path[255];
-  snprintf(path, sizeof(path), GPIO_BASE_DIR "/export");
-  export_fd_ = open(path, O_WRONLY);
-  if(export_fd_ < 0) {
-    perror("Failed to open export\n");
-    exit(-1);
+  struct stat sb;
+
+  snprintf(path, sizeof(path), GPIO_BASE_DIR "/gpio%d", pin_);
+  if (stat(path, &sb) != 0) {
+      owner_ = true;
+      printf("Owner of %s\n", path);
+  } else {
+      printf("Not owner of %s\n", path);
   }
 
-  snprintf(path, sizeof(path), GPIO_BASE_DIR "/unexport");
-  unexport_fd_ = open(path, O_WRONLY);
-  if(export_fd_ < 0) {
-    perror("Failed to open unexport\n");
-    exit(-1);
+  if(owner_) {
+      snprintf(path, sizeof(path), GPIO_BASE_DIR "/export");
+      export_fd_ = open(path, O_WRONLY);
+      if(export_fd_ < 0) {
+          perror("Failed to open export\n");
+          exit(-1);
+      }
+
+      snprintf(path, sizeof(path), GPIO_BASE_DIR "/unexport");
+      unexport_fd_ = open(path, O_WRONLY);
+      if(export_fd_ < 0) {
+          perror("Failed to open unexport\n");
+          exit(-1);
+      }
+
+      char pin_num[10];
+      snprintf(pin_num, sizeof(pin_num), "%d", pin_);
+      int len = strlen(pin_num);
+
+      int ret;
+      ret = write(export_fd_, pin_num, len);
+      if(ret < len) {
+          perror("Failed to export pin");
+          exit(-1);
+      }
+
   }
-
-
-
-  char pin_num[10];
-  snprintf(pin_num, sizeof(pin_num), "%d", pin_);
-  int len = strlen(pin_num);
-
-  int ret;
-  ret = write(export_fd_, pin_num, len);
-  if(ret < len) {
-    perror("Failed to export pin");
-    exit(-1);
-  }
-
   // GPIO should now be exported, meaning that /sys/class/gpio### exists
 
   int path_start = snprintf(path, sizeof(path), GPIO_BASE_DIR "/gpio%d", pin_);

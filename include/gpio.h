@@ -60,5 +60,6 @@ private:
   int direction_fd_;
   int value_fd_;
   int active_low_fd_;
+  bool owner_;
 };
 #endif
