@@ -12,7 +12,7 @@ const bool kReverse = true;
 
 KillSwitch::KillSwitch(unsigned int pin) : pin_(pin), node_() {
   pin_.SetDirection(GPIO::IN);
-  pin_.SetActiveState(GPIO::ACTIVE_LOW);
+  pin_.SetActiveState(GPIO::ACTIVE_HIGH);
 }
 
 KillSwitch::~KillSwitch() {}
